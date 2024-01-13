@@ -1,6 +1,11 @@
-import mongoose from "mongoose"
+import mongoose, { Schema } from "mongoose"
 
 const noteSchema =mongoose.Schema({
+    userId:{
+        type:Schema.Types.ObjectId,
+        ref:"User"
+
+    },
     title: {
         type: String,
         required:true,
