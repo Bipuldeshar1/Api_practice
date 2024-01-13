@@ -2,6 +2,21 @@ import {User} from "../models/user.model.js";
 
 import  Jwt  from "jsonwebtoken";
 
+const generateAccessAndRefreshToken = async(userId)=>{
+    try {
+        const user= await User.findById(userId)
+        const accessToken= user.generateAccessToken();
+        const refreshToken= user.generateRefreshToken();
+
+        user.refreshToken= refreshToken
+        await user.save({ValiditBeforeSave: false})
+
+        return{accessToken,refreshToken}
+    } catch (error) {
+        throw new Error("sth went wrong while generating refresha nd access token")
+    }
+}
+
 const userRegister= async(req, res) => {
     const{email,userName,password}= req.body;
 
@@ -34,17 +49,20 @@ const login= async(req, res) => {
     if(user.password != password){
         return res.json("psw mis match")
     }
-    const accessToken =Jwt.sign({
-        user:{
-            userName:user.userName,
-            email:user.email,
-            id:user._id
-        }
-    },
-    "asdf",
-    {expiresIn:"15m"}
-    )
-    return res.status(200).json(accessToken);
+
+    const {accessToken,refreshToken}=await generateAccessAndRefreshToken(user._id)
+
+    const loggedInUSer = await User.findById(user._id).select("-password -refreshToken")
+   
+    const options ={
+        httpOnly: true,
+        secure:true,
+     }
+    
+    return res.status(200).cookie("accessToken",accessToken,options)
+    .cookie("refreshToken",refreshToken,options).json(
+        `${loggedInUSer}, refresh ${refreshToken}, access ${accessToken}`
+    );
 
 
 }
@@ -66,11 +84,18 @@ const logoutUser =async(req, res) =>{
              new:true
          },
      )
-   
+     const options ={
+        httpOnly: true,
+        secure:true,
+     }
  
       return res.
       status(200).
       
-      json("user logged out successfully")
+      clearCookie("accessToken",options).
+      clearCookie("refreshToken",options).
+      json('logout success')
  }
+
+ 
 export {userRegister, login, getCurrentUser,logoutUser}
